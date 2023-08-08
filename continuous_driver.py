@@ -7,6 +7,7 @@ import argparse
 import logging
 import pickle
 import torch
+import csv
 from distutils.util import strtobool
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
@@ -32,6 +33,7 @@ def parse_args():
     parser.add_argument('--load-checkpoint', type=bool, default=False, help='resume training?')
     parser.add_argument('--torch-deterministic', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True, help='if toggled, `torch.backends.cudnn.deterministic=False`')
     parser.add_argument('--cuda', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True, help='if toggled, cuda will not be enabled by deafult')
+    parser.add_argument('--render-mode', type=bool, default=False, help='display Carla')
     args = parser.parse_args()
     
     return args
@@ -46,8 +48,10 @@ def boolean_string(s):
 def main():
     args = parse_args()
     exp_name = args.exp_name
-    train = args.train
+    # train = args.train
+    train = True
     town = args.town
+    render_mode = args.render_mode
     checkpoint_load = args.load_checkpoint
     total_timesteps = args.total_timesteps
     action_std_init = args.action_std_init
@@ -100,11 +104,16 @@ def main():
         ConnectionRefusedError
 
     if train:
+        print('The agent is set to train mode')
         env = CarlaEnvironment(client, world, town)
     else:
         env = CarlaEnvironment(client, world, town, checkpoint_frequency=None)
     encode = EncodeState(LATENT_DIM)
-
+    
+    if render_mode:
+        settings = world.get_settings()
+        settings.no_rendering_mode = True
+        world.apply_settings(settings)
 
     #========================================================================
     #                           ALGORITHM
@@ -183,6 +192,7 @@ def main():
                     cumulative_score = np.mean(scores)
 
                 print('Episode: {}'.format(episode),' Timestep: {}'.format(timestep),' Reward:  {:.2f}'.format(current_ep_reward),' Average Reward:  {:.2f}'.format(cumulative_score))
+                    
                 if episode % 10 == 0:
                     agent.learn()
                     agent.chkpt_save()
@@ -210,6 +220,16 @@ def main():
                     episodic_length = list()
                     deviation_from_center = 0
                     distance_covered = 0
+                    
+                    logs_obj = {'episode': episode, 'timestep': timestep, 'reward': reward, 'cumulative_reward': cumulative_score}
+                    csv_file_path = 'logs\PPO\Town06\Town06.csv'
+                    file_exists = os.path.isfile(csv_file_path)
+                    with open(csv_file_path, 'a', newline='') as csvfile:
+                        fieldnames = logs_obj.keys()
+                        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                        if not file_exists:
+                            writer.writeheader()
+                        writer.writerow(logs_obj)
 
                 if episode % 100 == 0:
                     agent.save()
@@ -218,7 +238,7 @@ def main():
                     data_obj = {'cumulative_score': cumulative_score, 'episode': episode, 'timestep': timestep, 'action_std_init': action_std_init}
                     with open(chkpt_file, 'wb') as handle:
                         pickle.dump(data_obj, handle)
-                        
+
             print("Terminating the run.")
             sys.exit()
         else:

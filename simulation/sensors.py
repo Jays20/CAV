@@ -41,17 +41,16 @@ class CameraSensor():
         placeholder = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
         placeholder1 = placeholder.reshape((image.width, image.height, 4))
         target = placeholder1[:, :, :3]
-        self.front_camera.append(target)#/255.0)
+        self.front_camera.append(target)
 
 
 # ---------------------------------------------------------------------|
-# ------------------------------- ENV CAMERA |
+# ------------------------------- Birds Eye View Sensor of Vehicle |
 # ---------------------------------------------------------------------|
 
-class CameraSensorEnv:
+class TrackEgoVehicleSensor:
 
     def __init__(self, vehicle):
-
         pygame.init()
         self.display = pygame.display.set_mode((720, 720),pygame.HWSURFACE | pygame.DOUBLEBUF)
         self.sensor_name = RGB_CAMERA
@@ -60,12 +59,9 @@ class CameraSensorEnv:
         world = self.parent.get_world()
         self.sensor = self._set_camera_sensor(world)
         weak_self = weakref.ref(self)
-        self.sensor.listen(lambda image: CameraSensorEnv._get_third_person_camera(weak_self, image))
-
-    # Third camera is setup and provide the visual observations for our environment.
+        self.sensor.listen(lambda image: TrackEgoVehicleSensor._get_third_person_camera(weak_self, image))
 
     def _set_camera_sensor(self, world):
-
         thrid_person_camera_bp = world.get_blueprint_library().find(self.sensor_name)
         thrid_person_camera_bp.set_attribute('image_size_x', f'720')
         thrid_person_camera_bp.set_attribute('image_size_y', f'720')
@@ -123,4 +119,3 @@ class CollisionSensor:
         impulse = event.normal_impulse
         intensity = math.sqrt(impulse.x ** 2 + impulse.y ** 2 + impulse.z ** 2)
         self.collision_data.append(intensity)
-

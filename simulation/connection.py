@@ -20,8 +20,6 @@ class ClientConnection:
 
     def setup(self):
         try:
-
-            # Connecting to the  Server
             self.client = carla.Client(HOST, PORT)
             self.client.set_timeout(TIMEOUT)
             self.world = self.client.load_world(self.town)
@@ -29,8 +27,7 @@ class ClientConnection:
             return self.client, self.world
 
         except Exception as e:
-            print(
-                'Failed to make a connection with the server: {}'.format(e))
+            print('Failed to make a connection with the server: {}'.format(e))
             self.error()
 
     # An error method: prints out the details if the client failed to make a connection

@@ -19,7 +19,5 @@ NUMBER_OF_PEDESTRIAN = 10
 CONTINUOUS_ACTION = True
 VISUAL_DISPLAY = True
 
-
 RGB_CAMERA = 'sensor.camera.rgb'
 SSC_CAMERA = 'sensor.camera.semantic_segmentation'
-
