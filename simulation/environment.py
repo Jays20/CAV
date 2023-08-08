@@ -180,7 +180,7 @@ class CarlaEnvironment():
                 steer = max(min(steer, 1.0), -1.0)
                 throttle = float((action_idx[1] + 1.0)/2)
                 throttle = max(min(throttle, 1.0), 0.0)
-                self.vehicle.apply_control(carla.VehicleControl(steer=self.previous_steer*0.9 + steer*0.1, throttle=self.throttle*0.9 + throttle*0.1))
+                self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=throttle))
                 self.previous_steer = steer
                 self.throttle = throttle
             else:
