@@ -143,7 +143,6 @@ def main():
         if train:
             # Agent training
             while timestep < total_timesteps:
-
                 observation = env.reset()
                 observation = encode.process(observation)
                 current_ep_reward = 0
@@ -203,6 +202,7 @@ def main():
                     data_obj = {'cumulative_score': cumulative_score, 'episode': episode, 'timestep': timestep, 'action_std_init': action_std_init}
                     with open(chkpt_file, 'wb') as handle:
                         pickle.dump(data_obj, handle)
+                    handle.close()
 
                 if episode % 5 == 0:
                     writer.add_scalar("Episodic Reward/episode", scores[-1], episode)
@@ -226,10 +226,11 @@ def main():
                     file_exists = os.path.isfile(csv_file_path)
                     with open(csv_file_path, 'a', newline='') as csvfile:
                         fieldnames = logs_obj.keys()
-                        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                        writer_csv = csv.DictWriter(csvfile, fieldnames=fieldnames)
                         if not file_exists:
-                            writer.writeheader()
-                        writer.writerow(logs_obj)
+                            writer_csv.writeheader()
+                        writer_csv.writerow(logs_obj)
+                    csvfile.close()
 
                 if episode % 100 == 0:
                     agent.save()
@@ -238,6 +239,7 @@ def main():
                     data_obj = {'cumulative_score': cumulative_score, 'episode': episode, 'timestep': timestep, 'action_std_init': action_std_init}
                     with open(chkpt_file, 'wb') as handle:
                         pickle.dump(data_obj, handle)
+                    handle.close
 
             print("Terminating the run.")
             sys.exit()
@@ -295,7 +297,6 @@ def main():
 
     finally:
         sys.exit()
-
 
 if __name__ == "__main__":
     try:        
