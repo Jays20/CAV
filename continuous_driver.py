@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument('--episode-length', type=int, default=EPISODE_LENGTH, help='max timesteps in an episode')
     parser.add_argument('--train', default=False, type=boolean_string, help='is it training?')
     parser.add_argument('--town', type=str, default="Town06", help='which town do you like?')
-    parser.add_argument('--load-checkpoint', type=bool, default=False, help='resume training?')
+    parser.add_argument('--load-checkpoint', type=bool, default=True, help='resume training?')
     parser.add_argument('--torch-deterministic', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True, help='if toggled, `torch.backends.cudnn.deterministic=False`')
     parser.add_argument('--cuda', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True, help='if toggled, cuda will not be enabled by deafult')
     parser.add_argument('--render-mode', type=bool, default=False, help='display Carla')
@@ -191,18 +191,17 @@ def main():
                     cumulative_score = np.mean(scores)
 
                 print('Episode: {}'.format(episode),' Timestep: {}'.format(timestep),' Reward:  {:.2f}'.format(current_ep_reward),' Average Reward:  {:.2f}'.format(cumulative_score))
-                    
-                if episode % 10 == 0:
-                    agent.learn()
-                    agent.chkpt_save()
-                    chkt_file_nums = len(next(os.walk(f'checkpoints/PPO/{town}'))[2])
-                    if chkt_file_nums != 0:
-                        chkt_file_nums -= 1
-                    chkpt_file = f'checkpoints/PPO/{town}/checkpoint_ppo_'+str(chkt_file_nums)+'.pickle'
-                    data_obj = {'cumulative_score': cumulative_score, 'episode': episode, 'timestep': timestep, 'action_std_init': action_std_init}
-                    with open(chkpt_file, 'wb') as handle:
-                        pickle.dump(data_obj, handle)
-                    handle.close()
+
+                # Save agent after each episode
+                agent.chkpt_save()
+                chkt_file_nums = len(next(os.walk(f'checkpoints/PPO/{town}'))[2])
+                if chkt_file_nums != 0:
+                    chkt_file_nums -= 1
+                chkpt_file = f'checkpoints/PPO/{town}/checkpoint_ppo_'+str(chkt_file_nums)+'.pickle'
+                data_obj = {'cumulative_score': cumulative_score, 'episode': episode, 'timestep': timestep, 'action_std_init': action_std_init}
+                with open(chkpt_file, 'wb') as handle:
+                    pickle.dump(data_obj, handle)
+                handle.close()
 
                 if episode % 5 == 0:
                     writer.add_scalar("Episodic Reward/episode", scores[-1], episode)
@@ -221,16 +220,19 @@ def main():
                     deviation_from_center = 0
                     distance_covered = 0
                     
-                    logs_obj = {'episode': episode, 'timestep': timestep, 'reward': reward, 'cumulative_reward': cumulative_score}
-                    csv_file_path = 'logs\PPO\Town06\Town06.csv'
-                    file_exists = os.path.isfile(csv_file_path)
-                    with open(csv_file_path, 'a', newline='') as csvfile:
-                        fieldnames = logs_obj.keys()
-                        writer_csv = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                        if not file_exists:
-                            writer_csv.writeheader()
-                        writer_csv.writerow(logs_obj)
-                    csvfile.close()
+                    # TODO: FIX
+                    # logs_obj = {'episode': episode, 'timestep': timestep, 'reward': reward, 'cumulative_reward': cumulative_score}                   csv_file_path = 'logs\PPO\Town06\Town06.csv'
+                    # file_exists = os.path.isfile(csv_file_path)
+                    # with open(csv_file_path, 'a', newline='') as csvfile:
+                    #    fieldnames = logs_obj.keys()
+                    #    writer_csv = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    #    if not file_exists:
+                    #         writer_csv.writeheader()
+                    #    writer_csv.writerow(logs_obj)
+                    # csvfile.close()
+
+                if episode % 10 == 0:
+                    agent.learn()
 
                 if episode % 100 == 0:
                     agent.save()
@@ -303,5 +305,7 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         sys.exit()
+    except Exception:
+        main()
     finally:
-        print('\nExit')
+        main()

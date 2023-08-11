@@ -44,7 +44,6 @@ class CarlaEnvironment():
     # A reset function for reseting our environment.
     def reset(self):
         try:
-            print('Resetting environment')
             if len(self.actor_list) != 0 or len(self.sensor_list) != 0:
                 self.client.apply_batch([carla.command.DestroyActor(x) for x in self.sensor_list])
                 self.client.apply_batch([carla.command.DestroyActor(x) for x in self.actor_list])
@@ -97,8 +96,8 @@ class CarlaEnvironment():
             self.max_speed = 85.0
             self.min_speed = 75.0
             self.max_distance_from_center = 3
-            self.throttle = float(0.0)
-            self.previous_steer = float(0.0)
+            self.steer = float(0.0)
+            self.acceleration = float(0.0)
             self.velocity = float(0.0)
             self.distance_from_center = float(0.0)
             self.angle = float(0.0)
@@ -137,15 +136,14 @@ class CarlaEnvironment():
                 self.vehicle.set_transform(transform)
                 self.current_waypoint_index = self.checkpoint_waypoint_index
 
-            self.navigation_obs = np.array([self.throttle, self.velocity, self.previous_steer, self.distance_from_center, self.angle])
+            self.navigation_obs = np.array([self.acceleration, self.velocity, self.steer, self.distance_from_center, self.angle])
 
             time.sleep(0.5)
 
             self.collision_history.clear()
             self.episode_start_time = time.time()
-            self.set_other_vehicles()
+            # self.set_other_vehicles()
 
-            print('Environment reset complete')
             return [self.image_obs, self.navigation_obs]
 
         except:
@@ -174,36 +172,27 @@ class CarlaEnvironment():
             velocity = self.vehicle.get_velocity()
             self.velocity = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) * 3.6
             
-            # Action fron action space for contolling the vehicle with a discrete action
-            if self.continous_action_space:
-                steer = float(action_idx[0])
-                steer = max(min(steer, 1.0), -1.0)
-                throttle = float((action_idx[1] + 1.0)/2)
-                throttle = max(min(throttle, 1.0), 0.0)
-                self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=throttle))
-                self.previous_steer = steer
-                self.throttle = throttle
-            else:
-                steer = self.action_space[action_idx]
-                if self.velocity < 20.0:
-                    self.vehicle.apply_control(carla.VehicleControl(steer=self.previous_steer*0.9 + steer*0.1, throttle=1.0))
-                else:
-                    self.vehicle.apply_control(carla.VehicleControl(steer=self.previous_steer*0.9 + steer*0.1))
-                self.previous_steer = steer
-                self.throttle = 1.0
+            # Apply vehicle steering and acceleration
+            steer = round(float(action_idx[0]), 1)
+            steer = max(min(steer, 1.0), -1.0)
+
+            acceleration = round(float(action_idx[1]), 1)
+            acceleration = max(min(acceleration, 1.0), -1.0)
             
-            # Traffic Light state
-            if self.vehicle.is_at_traffic_light():
-                traffic_light = self.vehicle.get_traffic_light()
-                if traffic_light.get_state() == carla.TrafficLightState.Red:
-                    traffic_light.set_state(carla.TrafficLightState.Green)
+            if acceleration > 0:
+                if acceleration > 0.5:
+                    self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=1))
+                else:
+                    self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=0.5))
+            else:
+                self.vehicle.apply_control(carla.VehicleControl(steer=steer, brake=abs(acceleration)))
 
+            self.steer        = steer
+            self.acceleration = acceleration
+
+            # Collect vehicle data
             self.collision_history = self.collision_obj.collision_data            
-
-            # Rotation of the vehicle in correlation to the map/lane
             self.rotation = self.vehicle.get_transform().rotation.yaw
-
-            # Location of the car
             self.location = self.vehicle.get_location()
 
             #transform = self.vehicle.get_transform()
@@ -227,8 +216,8 @@ class CarlaEnvironment():
             self.center_lane_deviation += self.distance_from_center
 
             # Get angle difference between closest waypoint and vehicle forward vector
-            fwd    = self.vector(self.vehicle.get_velocity())
-            wp_fwd = self.vector(self.current_waypoint.transform.rotation.get_forward_vector())
+            fwd         = self.vector(self.vehicle.get_velocity())
+            wp_fwd      = self.vector(self.current_waypoint.transform.rotation.get_forward_vector())
             self.angle  = self.angle_diff(fwd, wp_fwd)
 
              # Update checkpoint for training
@@ -241,14 +230,14 @@ class CarlaEnvironment():
             reward = 0
 
             if len(self.collision_history) != 0:
-                done = True
+                done   = True
                 reward = -50
             elif self.distance_from_center > self.max_distance_from_center:
-                done = True
+                done   = True
                 reward = -10
-            elif self.episode_start_time + 10 < time.time() and self.velocity < 1.0:
-                reward = -10
-                done = True
+            elif self.episode_start_time + 15 < time.time() and self.velocity < 1.0:
+                reward = -50
+                done   = True
 
             # Interpolated from 1 when centered to 0 when 3 m from center
             centering_factor = max(1.0 - self.distance_from_center / self.max_distance_from_center, 0.0)
@@ -285,7 +274,7 @@ class CarlaEnvironment():
             normalized_velocity = self.velocity/self.target_speed
             normalized_distance_from_center = self.distance_from_center / self.max_distance_from_center
             normalized_angle = abs(self.angle / np.deg2rad(20))
-            self.navigation_obs = np.array([self.throttle, self.velocity, normalized_velocity, normalized_distance_from_center, normalized_angle])
+            self.navigation_obs = np.array([self.acceleration, self.velocity, normalized_velocity, normalized_distance_from_center, normalized_angle])
             
             # Remove everything that has been spawned in the env
             if done:
@@ -299,7 +288,7 @@ class CarlaEnvironment():
                 
                 for actor in self.actor_list:
                     actor.destroy()
-            
+
             return [self.image_obs, self.navigation_obs], reward, done, [self.distance_covered, self.center_lane_deviation]
 
         except:
