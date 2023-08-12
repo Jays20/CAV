@@ -80,8 +80,36 @@ class TrackEgoVehicleSensor:
         placeholder2 = placeholder2[:, :, ::-1]
         self.surface = pygame.surfarray.make_surface(placeholder2.swapaxes(0, 1))
         self.display.blit(self.surface, (0, 0))
+
+        font = pygame.font.Font(None, 36)
+
+        if round(self.parent.get_location().z) == 0:
+            speed_text = font.render(f'Speed: {self.get_speed_km():.0f} km/h', True, (255, 255, 255))
+
+            if hasattr(self, 'previous_location'):
+                distance_covered = self.get_distance_between_locations()
+                self.distance_traveled += distance_covered
+            else:
+                self.distance_traveled = 0.0
+            self.previous_location = self.parent.get_location()
+            distance_text = font.render(f'Distance: {self.distance_traveled:.0f} meters', True, (255, 255, 255))
+        else:
+            speed_text = font.render(f'Speed: {0:.0f} km/h', True, (255, 255, 255))
+            distance_text = font.render(f'Distance: {0:.0f} meters', True, (255, 255, 255))
+
+        self.display.blit(speed_text, (10, 10))
+        self.display.blit(distance_text, (10, 50))
+
         pygame.display.flip()
 
+    def get_speed_km(self):
+        return math.sqrt(self.parent.get_velocity().x **2  + self.parent.get_velocity().y ** 2 + self.parent.get_velocity().z ** 2) * 3.6
+
+    def get_distance_between_locations(self):
+        current_location = self.parent.get_location()
+        previous_location = self.previous_location
+
+        return math.sqrt((previous_location.x - current_location.x) ** 2 + (previous_location.y - current_location.y) ** 2 + (previous_location.z - current_location.z) ** 2)
 
 
 # ---------------------------------------------------------------------|
