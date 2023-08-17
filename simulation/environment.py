@@ -2,6 +2,7 @@ import time
 import random
 import numpy as np
 import pygame
+import math
 from simulation.connection import carla
 from simulation.sensors import CameraSensor, TrackEgoVehicleSensor, CollisionSensor
 from simulation.settings import *
@@ -37,7 +38,6 @@ class CarlaEnvironment():
         self.sensor_list = list()
         self.actor_list = list()
         self.walker_list = list()
-        self.set_other_vehicles()
         # self.create_pedestrians()
 
 
@@ -51,16 +51,9 @@ class CarlaEnvironment():
                 self.actor_list.clear()
             self.remove_sensors()
 
-            # Blueprint of our main vehicle
             vehicle_bp = self.get_vehicle(CAR_NAME)
 
-            if self.town == "Town07":
-                transform = self.map.get_spawn_points()[38]
-                self.total_distance = 750
-            elif self.town == "Town02":
-                transform = self.map.get_spawn_points()[1]
-                self.total_distance = 780
-            elif self.town == "Town06":
+            if self.town == "Town06":
                 transform = self.map.get_spawn_points()[257]
                 self.total_distance = 100
             else:
@@ -270,10 +263,26 @@ class CarlaEnvironment():
             while(len(self.camera_obj.front_camera) == 0):
                 time.sleep(0.0001)
 
+            # Observation parameters
             self.image_obs = self.camera_obj.front_camera.pop(-1)
             normalized_velocity = self.velocity/self.target_speed
             normalized_distance_from_center = self.distance_from_center / self.max_distance_from_center
             normalized_angle = abs(self.angle / np.deg2rad(20))
+
+            ego_position = self.vehicle.get_location()
+            vehicle_connectivity = []
+            for vehicle in self.actor_list:
+                if len(self.actor_list) > 1 and vehicle != self.vehicle:
+                    vehicle_location = vehicle.get_location()     
+                    distance_to_ego = math.sqrt((ego_position.x - vehicle_location.x) ** 2 + (ego_position.y - vehicle_location.y) ** 2 + (ego_position.z - vehicle_location.z) ** 2)
+                    # Check that the vehicle is within a reasonable distance
+                    if distance_to_ego < 150:
+                        velocity = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2)
+                        vehicle_data = [vehicle_location.x, vehicle_location.y, vehicle_location.z, distance_to_ego, velocity]
+                        vehicle_connectivity.append(vehicle_data)
+
+            vehicle_connectivity = np.array(vehicle_connectivity)
+
             self.navigation_obs = np.array([self.acceleration, self.velocity, normalized_velocity, normalized_distance_from_center, normalized_angle])
             
             # Remove everything that has been spawned in the env
@@ -289,7 +298,7 @@ class CarlaEnvironment():
                 for actor in self.actor_list:
                     actor.destroy()
 
-            return [self.image_obs, self.navigation_obs], reward, done, [self.distance_covered, self.center_lane_deviation]
+            return [self.image_obs, self.navigation_obs, vehicle_connectivity], reward, done, [self.distance_covered, self.center_lane_deviation]
 
         except:
             print('Exception at step method. Exiting ....')
@@ -368,15 +377,14 @@ class CarlaEnvironment():
 
     def set_other_vehicles(self):
         try:
-            # Set spawn ponts for Town06
-            spawn_points_town06 = [279, 8, 275, 12, 271]
-            NUMBER_OF_VEHICLES = 5
-            for _ in range(0, NUMBER_OF_VEHICLES):
+            # spawn_points_town06 = [279, 12, 275, 280, 13, 276]
+            spawn_points_town06 = [12]
+            for _ in range(0, len(spawn_points_town06)):
                 spawn_point = self.map.get_spawn_points()[spawn_points_town06[_]]
                 bp_vehicle = random.choice(self.blueprint_library.filter('vehicle'))
                 other_vehicle = self.world.try_spawn_actor(bp_vehicle, spawn_point)
                 if other_vehicle is not None:
-                    # other_vehicle.set_autopilot(True)
+                    other_vehicle.set_autopilot(True)
                     self.actor_list.append(other_vehicle)
             print("NPC actors spawned")
         except:

@@ -29,7 +29,7 @@ class PPOAgent(object):
     def __init__(self, town, action_std_init=0.4):
         
         #self.env = env
-        self.obs_dim = 100
+        self.obs_dim = 125
         self.action_dim = 2
         self.clip = POLICY_CLIP
         self.gamma = GAMMA
@@ -53,7 +53,6 @@ class PPOAgent(object):
 
 
     def get_action(self, obs, train):
-
         with torch.no_grad():
             if isinstance(obs, np.ndarray):
                 obs = torch.tensor(obs, dtype=torch.float)
@@ -64,13 +63,14 @@ class PPOAgent(object):
             self.memory.log_probs.append(logprob)
 
         return action.detach().cpu().numpy().flatten()
-    
+
+
     def set_action_std(self, new_action_std):
         self.action_std = new_action_std
         self.policy.set_action_std(new_action_std)
         self.old_policy.set_action_std(new_action_std)
 
-    
+
     def decay_action_std(self, action_std_decay_rate, min_action_std):
         self.action_std = self.action_std - action_std_decay_rate
         if (self.action_std <= min_action_std):
@@ -80,7 +80,6 @@ class PPOAgent(object):
 
 
     def learn(self):
-
         # Monte Carlo estimate of returns
         rewards = []
         discounted_reward = 0
@@ -128,11 +127,12 @@ class PPOAgent(object):
         self.old_policy.load_state_dict(self.policy.state_dict())
         self.memory.clear()
 
-    
+
     def save(self):
         self.checkpoint_file_no = len(next(os.walk(PPO_CHECKPOINT_DIR+self.town))[2])
         checkpoint_file = PPO_CHECKPOINT_DIR+self.town+"/ppo_policy_" + str(self.checkpoint_file_no)+"_.pth"
         torch.save(self.old_policy.state_dict(), checkpoint_file)
+
 
     def chkpt_save(self):
         self.checkpoint_file_no = len(next(os.walk(PPO_CHECKPOINT_DIR+self.town))[2])
@@ -140,7 +140,8 @@ class PPOAgent(object):
             self.checkpoint_file_no -=1
         checkpoint_file = PPO_CHECKPOINT_DIR+self.town+"/ppo_policy_" + str(self.checkpoint_file_no)+"_.pth"
         torch.save(self.old_policy.state_dict(), checkpoint_file)
-   
+
+
     def load(self):
         self.checkpoint_file_no = len(next(os.walk(PPO_CHECKPOINT_DIR+self.town))[2]) - 1
         checkpoint_file = PPO_CHECKPOINT_DIR+self.town+"/ppo_policy_" + str(self.checkpoint_file_no)+"_.pth"

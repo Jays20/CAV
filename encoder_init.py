@@ -24,6 +24,13 @@ class EncodeState():
         image_obs = image_obs.permute(0,3,2,1)
         image_obs = self.conv_encoder(image_obs)
         navigation_obs = torch.tensor(observation[1], dtype=torch.float).to(self.device)
-        observation = torch.cat((image_obs.view(-1), navigation_obs), -1)
-        
-        return observation
+        new_observation = torch.cat((image_obs.view(-1), navigation_obs), -1)
+
+        if len(observation) > 2:
+            connectivity_obs = torch.tensor(observation[2], dtype=torch.float32).to(self.device)
+            new_observation = torch.cat((new_observation, connectivity_obs.view(-1)), -1)
+
+        remaining_zeros = torch.zeros(125 - new_observation.shape[0], device=self.device)
+        new_observation = torch.cat((new_observation, remaining_zeros), dim=0)
+
+        return new_observation
