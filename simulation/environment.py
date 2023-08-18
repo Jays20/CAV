@@ -7,6 +7,7 @@ from simulation.connection import carla
 from simulation.sensors import CameraSensor, TrackEgoVehicleSensor, CollisionSensor
 from simulation.settings import *
 
+MAX_CHANGE_STEER_THRESHOLD = 0.2
 
 class CarlaEnvironment():
 
@@ -27,6 +28,7 @@ class CarlaEnvironment():
         self.route_waypoints = None
         self.town = town
         self.debug = world.debug
+        self.prev_steering_angle = 0.0
         
         # Objects to be kept alive
         self.camera_obj = None
@@ -180,15 +182,13 @@ class CarlaEnvironment():
             else:
                 self.vehicle.apply_control(carla.VehicleControl(steer=steer, brake=abs(acceleration)))
 
-            self.steer        = steer
             self.acceleration = acceleration
 
             # Collect vehicle data
             self.collision_history = self.collision_obj.collision_data            
-            self.rotation = self.vehicle.get_transform().rotation.yaw
-            self.location = self.vehicle.get_location()
+            self.rotation          = self.vehicle.get_transform().rotation.yaw
+            self.location          = self.vehicle.get_location()
 
-            #transform = self.vehicle.get_transform()
             # Keep track of closest waypoint on the route
             waypoint_index = self.current_waypoint_index
             for _ in range(len(self.route_waypoints)):
@@ -201,52 +201,24 @@ class CarlaEnvironment():
                 else:
                     break
 
-            self.current_waypoint_index = waypoint_index
             # Calculate deviation from center of the lane
-            self.current_waypoint = self.route_waypoints[ self.current_waypoint_index % len(self.route_waypoints)]
-            self.next_waypoint = self.route_waypoints[(self.current_waypoint_index+1) % len(self.route_waypoints)]
-            self.distance_from_center = self.distance_to_line(self.vector(self.current_waypoint.transform.location),self.vector(self.next_waypoint.transform.location),self.vector(self.location))
-            self.center_lane_deviation += self.distance_from_center
+            self.current_waypoint_index = waypoint_index
+            self.current_waypoint       = self.route_waypoints[ self.current_waypoint_index % len(self.route_waypoints)]
+            self.next_waypoint          = self.route_waypoints[(self.current_waypoint_index+1) % len(self.route_waypoints)]
+            self.distance_from_center   = self.distance_to_line(self.vector(self.current_waypoint.transform.location),self.vector(self.next_waypoint.transform.location),self.vector(self.location))
+            self.center_lane_deviation  += self.distance_from_center
 
             # Get angle difference between closest waypoint and vehicle forward vector
             fwd         = self.vector(self.vehicle.get_velocity())
             wp_fwd      = self.vector(self.current_waypoint.transform.rotation.get_forward_vector())
             self.angle  = self.angle_diff(fwd, wp_fwd)
 
-             # Update checkpoint for training
+            # Update checkpoint for training
             if not self.fresh_start:
                 if self.checkpoint_frequency is not None:
                     self.checkpoint_waypoint_index = (self.current_waypoint_index // self.checkpoint_frequency) * self.checkpoint_frequency
 
-            # Rewards are given below!
-            done = False
-            reward = 0
-
-            if len(self.collision_history) != 0:
-                done   = True
-                reward = -50
-            elif self.distance_from_center > self.max_distance_from_center:
-                done   = True
-                reward = -10
-            elif self.episode_start_time + 15 < time.time() and self.velocity < 1.0:
-                reward = -50
-                done   = True
-
-            # Interpolated from 1 when centered to 0 when 3 m from center
-            centering_factor = max(1.0 - self.distance_from_center / self.max_distance_from_center, 0.0)
-            # Interpolated from 1 when aligned with the road to 0 when +/- 30 degress of road
-            angle_factor = max(1.0 - abs(self.angle / np.deg2rad(20)), 0.0)
-
-            if not done:
-                if self.continous_action_space:
-                    if self.velocity < self.min_speed:
-                        reward = (self.velocity / self.min_speed) * centering_factor * angle_factor    
-                    elif self.velocity > self.target_speed:               
-                        reward = (1.0 - (self.velocity-self.target_speed) / (self.max_speed-self.target_speed)) * centering_factor * angle_factor  
-                    else:                                         
-                        reward = 1.0 * centering_factor * angle_factor 
-                else:
-                    reward = 1.0 * centering_factor * angle_factor
+            done, reward = self.rewards(steer)
 
             if self.timesteps >= 3500:
                 done = True
@@ -264,27 +236,13 @@ class CarlaEnvironment():
                 time.sleep(0.0001)
 
             # Observation parameters
-            self.image_obs = self.camera_obj.front_camera.pop(-1)
-            normalized_velocity = self.velocity/self.target_speed
+            self.image_obs                  = self.camera_obj.front_camera.pop(-1)
+            normalized_velocity             = self.velocity/self.target_speed
             normalized_distance_from_center = self.distance_from_center / self.max_distance_from_center
-            normalized_angle = abs(self.angle / np.deg2rad(20))
+            normalized_angle                = abs(self.angle / np.deg2rad(20))
+            vehicle_connectivity            = self.vehicle_connectivity()
+            self.navigation_obs             = np.array([self.acceleration, self.velocity, normalized_velocity, normalized_distance_from_center, normalized_angle])
 
-            ego_position = self.vehicle.get_location()
-            vehicle_connectivity = []
-            for vehicle in self.actor_list:
-                if len(self.actor_list) > 1 and vehicle != self.vehicle:
-                    vehicle_location = vehicle.get_location()     
-                    distance_to_ego = math.sqrt((ego_position.x - vehicle_location.x) ** 2 + (ego_position.y - vehicle_location.y) ** 2 + (ego_position.z - vehicle_location.z) ** 2)
-                    # Check that the vehicle is within a reasonable distance
-                    if distance_to_ego < 150:
-                        velocity = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2)
-                        vehicle_data = [vehicle_location.x, vehicle_location.y, vehicle_location.z, distance_to_ego, velocity]
-                        vehicle_connectivity.append(vehicle_data)
-
-            vehicle_connectivity = np.array(vehicle_connectivity)
-
-            self.navigation_obs = np.array([self.acceleration, self.velocity, normalized_velocity, normalized_distance_from_center, normalized_angle])
-            
             # Remove everything that has been spawned in the env
             if done:
                 self.center_lane_deviation = self.center_lane_deviation / self.timesteps
@@ -311,6 +269,68 @@ class CarlaEnvironment():
             if self.display_on:
                 pygame.quit()
 
+
+# -------------------------------------------------
+# Vehicle Connectivity |
+# ------------------------------------------------
+
+    def vehicle_connectivity(self):
+        ego_position = self.vehicle.get_location()
+        vehicle_connectivity = []
+        for vehicle in self.actor_list:
+            if len(self.actor_list) > 1 and vehicle != self.vehicle:
+                vehicle_location = vehicle.get_location()
+                distance_to_ego = math.sqrt((ego_position.x - vehicle_location.x) ** 2 + (ego_position.y - vehicle_location.y) ** 2 + (ego_position.z - vehicle_location.z) ** 2)
+                # Check that the vehicle is within a reasonable distance
+                if distance_to_ego < 150:
+                    velocity = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2)
+                    vehicle_data = [vehicle_location.x, vehicle_location.y, vehicle_location.z, distance_to_ego, velocity]
+                    vehicle_connectivity.append(vehicle_data)
+
+        return np.array(vehicle_connectivity)
+
+
+# -------------------------------------------------
+# Reward Function |
+# -------------------------------------------------
+
+    def rewards(self, steer):
+        done   = False
+        reward = 0
+
+        if len(self.collision_history) != 0:
+            done   = True
+            reward = -150
+        elif self.distance_from_center > self.max_distance_from_center:
+            done   = True
+            reward = -10
+        elif self.episode_start_time + 15 < time.time() and self.velocity < 1.0:
+            reward = -50
+            done   = True
+
+        # Interpolated from 1 when centered to 0 when 3 m from center
+        centering_factor = max(1.0 - self.distance_from_center / self.max_distance_from_center, 0.0)
+        # Interpolated from 1 when aligned with the road to 0 when +/- 30 degress of road
+        angle_factor     = max(1.0 - abs(self.angle / np.deg2rad(20)), 0.0)
+
+        if not done:
+            if self.continous_action_space:
+                if self.velocity < self.min_speed:
+                    reward = (self.velocity / self.min_speed) * centering_factor * angle_factor
+                elif self.velocity > self.target_speed:
+                    reward = (1.0 - (self.velocity-self.target_speed) / (self.max_speed-self.target_speed)) * centering_factor * angle_factor
+                else:
+                    reward = 1.0 * centering_factor * angle_factor 
+            else:
+                reward = 1.0 * centering_factor * angle_factor
+
+        # Penalty for changes in steering wheel movements
+        steering_angle_change       = abs(steer - self.prev_steering_angle)
+        steering_smoothness_penalty = round(max(0, steering_angle_change - MAX_CHANGE_STEER_THRESHOLD) * 10)
+        self.prev_steering_angle    = steer
+        reward                      -= steering_smoothness_penalty
+
+        return done, reward
 
 
 # -------------------------------------------------
