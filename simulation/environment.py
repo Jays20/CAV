@@ -8,6 +8,7 @@ from simulation.sensors import CameraSensor, TrackEgoVehicleSensor, CollisionSen
 from simulation.settings import *
 
 MAX_CHANGE_STEER_THRESHOLD = 0.2
+MAX_JERK_THRESHOLD = 0.2
 
 class CarlaEnvironment():
 
@@ -29,6 +30,7 @@ class CarlaEnvironment():
         self.town = town
         self.debug = world.debug
         self.prev_steering_angle = 0.0
+        self.previous_acceleration = 0.0
         
         # Objects to be kept alive
         self.camera_obj = None
@@ -40,7 +42,6 @@ class CarlaEnvironment():
         self.sensor_list = list()
         self.actor_list = list()
         self.walker_list = list()
-        # self.create_pedestrians()
 
 
     # A reset function for reseting our environment.
@@ -218,7 +219,7 @@ class CarlaEnvironment():
                 if self.checkpoint_frequency is not None:
                     self.checkpoint_waypoint_index = (self.current_waypoint_index // self.checkpoint_frequency) * self.checkpoint_frequency
 
-            done, reward = self.rewards(steer)
+            done, reward = self.reward(steer, acceleration)
 
             if self.timesteps >= 3500:
                 done = True
@@ -294,7 +295,7 @@ class CarlaEnvironment():
 # Reward Function |
 # -------------------------------------------------
 
-    def rewards(self, steer):
+    def reward(self, steer, acceleration):
         done   = False
         reward = 0
 
@@ -324,71 +325,19 @@ class CarlaEnvironment():
             else:
                 reward = 1.0 * centering_factor * angle_factor
 
-        # Penalty for changes in steering wheel movements
+        # Penalty for changes in strong steering wheel movements
         steering_angle_change       = abs(steer - self.prev_steering_angle)
         steering_smoothness_penalty = round(max(0, steering_angle_change - MAX_CHANGE_STEER_THRESHOLD) * 10)
         self.prev_steering_angle    = steer
         reward                      -= steering_smoothness_penalty
 
+        # Penalty for strong jerk values
+        jerk                       = acceleration - self.previous_acceleration
+        jerk_penalty               = round(max(0, jerk - MAX_CHANGE_STEER_THRESHOLD) * 10)
+        self.previous_acceleration = acceleration
+        reward                     -= jerk_penalty
+
         return done, reward
-
-
-# -------------------------------------------------
-# Creating and Spawning Pedestrians in our world |
-# -------------------------------------------------
-
-    # Walkers are to be included in the simulation yet!
-    def create_pedestrians(self):
-        try:
-
-            # Our code for this method has been broken into 3 sections.
-
-            # 1. Getting the available spawn points in  our world.
-            # Random Spawn locations for the walker
-            walker_spawn_points = []
-            for i in range(NUMBER_OF_PEDESTRIAN):
-                spawn_point_ = carla.Transform()
-                loc = self.world.get_random_location_from_navigation()
-                if (loc != None):
-                    spawn_point_.location = loc
-                    walker_spawn_points.append(spawn_point_)
-
-            # 2. We spawn the walker actor and ai controller
-            # Also set their respective attributes
-            for spawn_point_ in walker_spawn_points:
-                walker_bp = random.choice(
-                    self.blueprint_library.filter('walker.pedestrian.*'))
-                walker_controller_bp = self.blueprint_library.find(
-                    'controller.ai.walker')
-                # Walkers are made visible in the simulation
-                if walker_bp.has_attribute('is_invincible'):
-                    walker_bp.set_attribute('is_invincible', 'false')
-                # They're all walking not running on their recommended speed
-                if walker_bp.has_attribute('speed'):
-                    walker_bp.set_attribute(
-                        'speed', (walker_bp.get_attribute('speed').recommended_values[1]))
-                else:
-                    walker_bp.set_attribute('speed', 0.0)
-                walker = self.world.try_spawn_actor(walker_bp, spawn_point_)
-                if walker is not None:
-                    walker_controller = self.world.spawn_actor(
-                        walker_controller_bp, carla.Transform(), walker)
-                    self.walker_list.append(walker_controller.id)
-                    self.walker_list.append(walker.id)
-            all_actors = self.world.get_actors(self.walker_list)
-
-            # set how many pedestrians can cross the road
-            #self.world.set_pedestrians_cross_factor(0.0)
-            # 3. Starting the motion of our pedestrians
-            for i in range(0, len(self.walker_list), 2):
-                # start walker
-                all_actors[i].start()
-            # set walk to random point
-                all_actors[i].go_to_location(
-                    self.world.get_random_location_from_navigation())
-        except:
-            self.client.apply_batch(
-                [carla.command.DestroyActor(x) for x in self.walker_list])
 
 
 # ---------------------------------------------------
