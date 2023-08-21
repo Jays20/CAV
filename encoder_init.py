@@ -30,7 +30,7 @@ class EncodeState():
             connectivity_obs = torch.tensor(observation[2], dtype=torch.float32).to(self.device)
             new_observation = torch.cat((new_observation, connectivity_obs.view(-1)), -1)
 
-        remaining_zeros = torch.zeros(125 - new_observation.shape[0], device=self.device)
+        remaining_zeros = torch.zeros(120 - new_observation.shape[0], device=self.device)
         new_observation = torch.cat((new_observation, remaining_zeros), dim=0)
 
         return new_observation

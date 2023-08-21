@@ -276,17 +276,13 @@ class CarlaEnvironment():
 # ------------------------------------------------
 
     def vehicle_connectivity(self):
-        ego_position = self.vehicle.get_location()
         vehicle_connectivity = []
         for vehicle in self.actor_list:
             if len(self.actor_list) > 1 and vehicle != self.vehicle:
                 vehicle_location = vehicle.get_location()
-                distance_to_ego = math.sqrt((ego_position.x - vehicle_location.x) ** 2 + (ego_position.y - vehicle_location.y) ** 2 + (ego_position.z - vehicle_location.z) ** 2)
-                # Check that the vehicle is within a reasonable distance
-                if distance_to_ego < 150:
-                    velocity = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2)
-                    vehicle_data = [vehicle_location.x, vehicle_location.y, vehicle_location.z, distance_to_ego, velocity]
-                    vehicle_connectivity.append(vehicle_data)
+                velocity = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2)
+                vehicle_data = [vehicle_location.x, vehicle_location.y, vehicle_location.z, velocity]
+                vehicle_connectivity.append(vehicle_data)
 
         return np.array(vehicle_connectivity)
 
@@ -327,13 +323,13 @@ class CarlaEnvironment():
 
         # Penalty for changes in strong steering wheel movements
         steering_angle_change       = abs(steer - self.prev_steering_angle)
-        steering_smoothness_penalty = round(max(0, steering_angle_change - MAX_CHANGE_STEER_THRESHOLD) * 10)
+        steering_smoothness_penalty = round(max(0, steering_angle_change - MAX_CHANGE_STEER_THRESHOLD))
         self.prev_steering_angle    = steer
         reward                      -= steering_smoothness_penalty
 
         # Penalty for strong jerk values
         jerk                       = acceleration - self.previous_acceleration
-        jerk_penalty               = round(max(0, jerk - MAX_CHANGE_STEER_THRESHOLD) * 10)
+        jerk_penalty               = round(max(0, jerk - MAX_CHANGE_STEER_THRESHOLD))
         self.previous_acceleration = acceleration
         reward                     -= jerk_penalty
 
