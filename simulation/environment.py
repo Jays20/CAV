@@ -10,6 +10,7 @@ from simulation.settings import *
 MAX_CHANGE_STEER_THRESHOLD = 0.4
 MAX_JERK_THRESHOLD = 0.2
 THRESHOLD_DISTANCE = 1
+TTC_THRESHOLD = 4
 
 class CarlaEnvironment():
 
@@ -341,6 +342,11 @@ class CarlaEnvironment():
                 if distance < THRESHOLD_DISTANCE:
                     reward -= 150
 
+                ttc = self.calculate_collision_time(vehicle)
+                if ttc and ttc < TTC_THRESHOLD:
+                    print('COLLISION BELOW THRESHOLD')
+                    reward -= 10
+
         return done, reward
 
 
@@ -369,9 +375,34 @@ class CarlaEnvironment():
 # Extra very important methods: their names explain their purpose|
 # ----------------------------------------------------------------
 
-    def distance_to_ego(self, vehicle_coordinates):
+    def calculate_collision_time(self, secondary_vehicle):
+        xa0 = round(self.vehicle.get_location().x, 3)
+        xat = round(self.vehicle.get_velocity().x, 3)
+        ya0 = round(self.vehicle.get_location().y, 3)
+        yat = round(self.vehicle.get_velocity().y, 3)
+        xb0 = round(secondary_vehicle.get_location().x, 3)
+        xbt = round(secondary_vehicle.get_velocity().x, 3)
+        yb0 = round(secondary_vehicle.get_location().y, 3)
+        ybt = round(secondary_vehicle.get_velocity().y, 3)
+
+        if xat == 0 and yat == 0:
+            return None
+
+        try:
+            # time in seconds when the two vehicles will be the closest
+            mintime = round(-(xa0 * xat - xat * xb0 - (xa0 - xb0) * xbt + ya0 * yat - yat * yb0 - (ya0 - yb0) * ybt) / (xat**2 - 2 * xat * xbt + xbt**2 + yat**2 - 2 * yat * ybt + ybt**2))
+        except:
+            mintime = None
+
+        if 0 < mintime < 15:
+            return mintime
+        else:
+            return None
+
+
+    def distance_to_ego(self, secondary_vehicle):
         ego_position = self.vehicle.get_location()
-        return math.sqrt((ego_position.x - vehicle_coordinates.x) ** 2 + (ego_position.y - vehicle_coordinates.y) ** 2 + (ego_position.z - vehicle_coordinates.z) ** 2)
+        return math.sqrt((ego_position.x - secondary_vehicle.x) ** 2 + (ego_position.y - secondary_vehicle.y) ** 2 + (ego_position.z - secondary_vehicle.z) ** 2)
 
 
     # Setter for changing the town on the server.
