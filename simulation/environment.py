@@ -7,8 +7,9 @@ from simulation.connection import carla
 from simulation.sensors import CameraSensor, TrackEgoVehicleSensor, CollisionSensor
 from simulation.settings import *
 
-MAX_CHANGE_STEER_THRESHOLD = 0.2
+MAX_CHANGE_STEER_THRESHOLD = 0.4
 MAX_JERK_THRESHOLD = 0.2
+THRESHOLD_DISTANCE = 1
 
 class CarlaEnvironment():
 
@@ -138,7 +139,7 @@ class CarlaEnvironment():
 
             self.collision_history.clear()
             self.episode_start_time = time.time()
-            # self.set_other_vehicles()
+            self.set_other_vehicles()
 
             return [self.image_obs, self.navigation_obs]
 
@@ -301,8 +302,8 @@ class CarlaEnvironment():
         elif self.distance_from_center > self.max_distance_from_center:
             done   = True
             reward = -10
-        elif self.episode_start_time + 15 < time.time() and self.velocity < 1.0:
-            reward = -50
+        elif self.episode_start_time + 6 < time.time() and self.velocity < 1.0:
+            reward = -150
             done   = True
 
         # Interpolated from 1 when centered to 0 when 3 m from center
@@ -323,7 +324,7 @@ class CarlaEnvironment():
 
         # Penalty for changes in strong steering wheel movements
         steering_angle_change       = abs(steer - self.prev_steering_angle)
-        steering_smoothness_penalty = round(max(0, steering_angle_change - MAX_CHANGE_STEER_THRESHOLD))
+        steering_smoothness_penalty = max(0, steering_angle_change - MAX_CHANGE_STEER_THRESHOLD)
         self.prev_steering_angle    = steer
         reward                      -= steering_smoothness_penalty
 
@@ -331,7 +332,14 @@ class CarlaEnvironment():
         jerk                       = acceleration - self.previous_acceleration
         jerk_penalty               = round(max(0, jerk - MAX_CHANGE_STEER_THRESHOLD))
         self.previous_acceleration = acceleration
-        reward                     -= jerk_penalty
+        # reward                     -= jerk_penalty
+        
+        # Near miss penalty
+        for vehicle in self.actor_list:
+            if len(self.actor_list) > 1 and vehicle != self.vehicle:
+                distance = self.distance_to_ego(vehicle.get_location())
+                if distance < THRESHOLD_DISTANCE:
+                    reward -= 150
 
         return done, reward
 
@@ -343,15 +351,14 @@ class CarlaEnvironment():
     def set_other_vehicles(self):
         try:
             # spawn_points_town06 = [279, 12, 275, 280, 13, 276]
-            spawn_points_town06 = [12]
+            spawn_points_town06 = [12, 275]
             for _ in range(0, len(spawn_points_town06)):
                 spawn_point = self.map.get_spawn_points()[spawn_points_town06[_]]
                 bp_vehicle = random.choice(self.blueprint_library.filter('vehicle'))
                 other_vehicle = self.world.try_spawn_actor(bp_vehicle, spawn_point)
                 if other_vehicle is not None:
-                    other_vehicle.set_autopilot(True)
+                    other_vehicle.apply_control(carla.VehicleControl(throttle=0.5))
                     self.actor_list.append(other_vehicle)
-            print("NPC actors spawned")
         except:
             print('Exception has occured in spawning vehicles')
             self.client.apply_batch(
@@ -361,6 +368,11 @@ class CarlaEnvironment():
 # ----------------------------------------------------------------
 # Extra very important methods: their names explain their purpose|
 # ----------------------------------------------------------------
+
+    def distance_to_ego(self, vehicle_coordinates):
+        ego_position = self.vehicle.get_location()
+        return math.sqrt((ego_position.x - vehicle_coordinates.x) ** 2 + (ego_position.y - vehicle_coordinates.y) ** 2 + (ego_position.z - vehicle_coordinates.z) ** 2)
+
 
     # Setter for changing the town on the server.
     def change_town(self, new_town):
