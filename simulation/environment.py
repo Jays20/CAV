@@ -8,7 +8,7 @@ from simulation.sensors import CameraSensor, TrackEgoVehicleSensor, CollisionSen
 from simulation.settings import *
 
 MAX_CHANGE_STEER_THRESHOLD = 0.4
-MAX_JERK_THRESHOLD = 0.2
+MAX_JERK_THRESHOLD = 1
 THRESHOLD_DISTANCE = 1
 TTC_THRESHOLD = 4
 
@@ -140,7 +140,7 @@ class CarlaEnvironment():
 
             self.collision_history.clear()
             self.episode_start_time = time.time()
-            self.set_other_vehicles()
+            #  self.set_other_vehicles()
 
             return [self.image_obs, self.navigation_obs]
 
@@ -221,7 +221,7 @@ class CarlaEnvironment():
                 if self.checkpoint_frequency is not None:
                     self.checkpoint_waypoint_index = (self.current_waypoint_index // self.checkpoint_frequency) * self.checkpoint_frequency
 
-            done, reward = self.reward(steer, acceleration)
+            done, reward, steering_penalty, jerk_penalty = self.reward(steer, acceleration)
 
             if self.timesteps >= 3500:
                 done = True
@@ -259,7 +259,7 @@ class CarlaEnvironment():
                 for actor in self.actor_list:
                     actor.destroy()
 
-            return [self.image_obs, self.navigation_obs, vehicle_connectivity], reward, done, [self.distance_covered, self.center_lane_deviation]
+            return [self.image_obs, self.navigation_obs, vehicle_connectivity], reward, done, [self.distance_covered, self.center_lane_deviation, steering_penalty, jerk_penalty]
 
         except:
             print('Exception at step method. Exiting ....')
@@ -329,11 +329,11 @@ class CarlaEnvironment():
         self.prev_steering_angle    = steer
         reward                      -= steering_smoothness_penalty
 
-        # Penalty for strong jerk values
-        jerk                       = acceleration - self.previous_acceleration
-        jerk_penalty               = round(max(0, jerk - MAX_CHANGE_STEER_THRESHOLD))
+        # Penalty for strong jerk values (changes in acceleration)
+        jerk                       = abs(acceleration - self.previous_acceleration)
+        jerk_penalty               = min(jerk, MAX_JERK_THRESHOLD)
         self.previous_acceleration = acceleration
-        # reward                     -= jerk_penalty
+        reward                     -= jerk_penalty
         
         # Near miss penalty
         for vehicle in self.actor_list:
@@ -347,7 +347,7 @@ class CarlaEnvironment():
                     print('COLLISION BELOW THRESHOLD')
                     reward -= 10
 
-        return done, reward
+        return done, reward, steering_smoothness_penalty, jerk_penalty
 
 
 # ---------------------------------------------------
