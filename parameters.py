@@ -26,7 +26,7 @@ MODEL_ONLINE = 'carla_dueling_dqn_online.pth'
 MODEL_TARGET = 'carla_dueling_dqn_target.pth'
 
 # Proximal Policy Optimization (hyper)parameters
-EPISODE_LENGTH = 3500
+EPISODE_LENGTH = 4500
 TOTAL_TIMESTEPS = 5e6
 ACTION_STD_INIT = 0.2
 TEST_TIMESTEPS = 5e4

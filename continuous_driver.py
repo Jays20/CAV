@@ -143,17 +143,28 @@ def main():
             if train:
                 # Agent training
                 while timestep < total_timesteps:
+                    run_step = False
                     observation = env.reset()
                     observation = encode.process(observation)
                     current_ep_reward = 0
                     t1 = datetime.now()
+                    episode_mark_time = time.time()
 
                     for t in range(args.episode_length):
 
                         # select action with policy
                         action = agent.get_action(observation, train=True)
 
-                        observation, reward, done, info = env.step(action)
+                        # required for jerk calculation
+                        tick = time.time()
+                        if (tick - episode_mark_time) >= 1:
+                            run_step = True
+                            episode_mark_time = tick
+                        else:
+                            run_step = False
+
+                        observation, reward, done, info = env.step(action, run_step)
+
                         if observation is None:
                             break
                         observation = encode.process(observation)
@@ -191,7 +202,6 @@ def main():
                         cumulative_score = ((cumulative_score * (episode - 1)) + current_ep_reward) / (episode)
                     else:
                         cumulative_score = np.mean(scores)
-
                     print('Episode: {}'.format(episode),' Timestep: {}'.format(timestep),' Reward:  {:.2f}'.format(current_ep_reward),' Average Reward:  {:.2f}'.format(cumulative_score))
 
                     # Save agent after each episode
@@ -310,7 +320,3 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         sys.exit()
-    except Exception:
-        main()
-    finally:
-        main()
