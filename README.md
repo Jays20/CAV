@@ -63,16 +63,7 @@ In order to train a new agent use the following command:
 python continuous_driver.py --exp-name ppo
 ```
 
-This will start training an agent with the default parameters, and checkpoints will be written to `checkpoints/PPO/<town>/` and the other metrics will be logged into `logs/PPO/<town>/`. Same as above, by default we're training on Town07 but we can change it to Town02 with this argument addition `--town Town02`.
-
-### How our Training looks like.
-
-<p align="center"><img width="550" src="info/gifs/town 7.gif"> </p>
-<p align="center">Town 7</p>
-<div>
-</div>
-<p align="center"><img width="550" src="info/gifs/town 2.gif"> </p>
-<p align="center">Town 2</p>
+This will start training an agent with the default parameters, and checkpoints will be written to `checkpoints/PPO/<town>/`. The default town is Town06.
 
 ## Variational AutoEncoder
 
