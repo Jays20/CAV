@@ -87,7 +87,7 @@ def main():
         timestep = 0
         episode = 0
         cumulative_score = 0
-        episodic_length = list()
+        episodic_length = 0
         scores = list()
         deviation_from_center = 0
         distance_covered = 0
@@ -188,7 +188,7 @@ def main():
                             t2 = datetime.now()
                             t3 = t2-t1
 
-                            episodic_length.append(abs(t3.total_seconds()))
+                            episodic_length = t3.total_seconds()
                             break
 
                     deviation_from_center += info[1]
@@ -215,33 +215,17 @@ def main():
                         pickle.dump(data_obj, handle)
                     handle.close()
 
-                    if episode % 5 == 0:
-                        writer.add_scalar("Episodic Reward/episode", scores[-1], episode)
-                        writer.add_scalar("Cumulative Reward/info", cumulative_score, episode)
-                        writer.add_scalar("Cumulative Reward/(t)", cumulative_score, timestep)
-                        writer.add_scalar("Average Episodic Reward/info", np.mean(scores[-5]), episode)
-                        writer.add_scalar("Average Reward/(t)", np.mean(scores[-5]), timestep)
-                        writer.add_scalar("Episode Length (s)/info", np.mean(episodic_length), episode)
-                        writer.add_scalar("Reward/(t)", current_ep_reward, timestep)
-                        writer.add_scalar("Average Deviation from Center/episode", deviation_from_center/5, episode)
-                        writer.add_scalar("Average Deviation from Center/(t)", deviation_from_center/5, timestep)
-                        writer.add_scalar("Average Distance Covered (m)/episode", distance_covered/5, episode)
-                        writer.add_scalar("Average Distance Covered (m)/(t)", distance_covered/5, timestep)
+                    writer.add_scalar("Episodic Reward", scores[-1], episode)
+                    writer.add_scalar("Cumulative Reward", cumulative_score, episode)
+                    writer.add_scalar("Episode Length (s)", episodic_length, episode)
+                    writer.add_scalar("Deviation from Center", deviation_from_center, episode)
+                    writer.add_scalar("Distance Covered (m)", distance_covered, episode)
+                    writer.add_scalar("Steering Penalty", steering_penalty, episode)
+                    writer.add_scalar("Jerk Penalty", jerk_penalty, episode)
 
-                        episodic_length = list()
-                        deviation_from_center = 0
-                        distance_covered = 0
-
-                        csv_file_path = 'logs\PPO\Town06\Town06.csv'
-                        logs_obj = {'episode': episode, 'timestep': timestep, 'reward': reward, 'cumulative_reward': cumulative_score, 'steering_penalty': steering_penalty, 'jerk_penalty': jerk_penalty}              
-                        file_exists = os.path.isfile(csv_file_path)
-                        with open(csv_file_path, 'a', newline='') as csvfile:
-                            fieldnames = logs_obj.keys()
-                            writer_csv = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                            if not file_exists:
-                                writer_csv.writeheader()
-                            writer_csv.writerow(logs_obj)
-                        csvfile.close()
+                    episodic_length       = 0
+                    deviation_from_center = 0
+                    distance_covered      = 0
 
                     if episode % 10 == 0:
                         agent.learn()
