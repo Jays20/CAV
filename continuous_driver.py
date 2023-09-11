@@ -191,10 +191,10 @@ def main():
                             episodic_length = t3.total_seconds()
                             break
 
-                    deviation_from_center += info[1]
-                    distance_covered += info[0]
-                    steering_penalty = info[2]
-                    jerk_penalty = info[3]
+                    distance_covered      = info[0]
+                    deviation_from_center = info[1]
+                    steering_penalty      = info[2]
+                    jerk_penalty          = info[3]
 
                     scores.append(current_ep_reward)
 

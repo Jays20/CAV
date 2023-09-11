@@ -345,7 +345,6 @@ class CarlaEnvironment():
         # Penalty for strong jerk values (changes in acceleration)
         jerk_penalty = 0
         if delta_acceleration is not None and delta_acceleration > MAX_JERK_THRESHOLD: # jerk = delta acceleration / delta time, delta time = 1
-            print('Large change in acceleration detected')
             jerk_penalty = delta_acceleration
             reward -= jerk_penalty
 
