@@ -34,6 +34,7 @@ def parse_args():
     parser.add_argument('--torch-deterministic', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True, help='if toggled, `torch.backends.cudnn.deterministic=False`')
     parser.add_argument('--cuda', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True, help='if toggled, cuda will not be enabled by deafult')
     parser.add_argument('--render-mode', type=bool, default=False, help='display Carla')
+    parser.add_argument('--highway-vehicles', type=bool, default=False, help='spawn vehicles on highway')
     args = parser.parse_args()
     
     return args
@@ -46,78 +47,80 @@ def boolean_string(s):
 
 
 def main():
-    while True:
-        args = parse_args()
-        exp_name = args.exp_name
-        train = args.train
-        town = args.town
-        render_mode = args.render_mode
-        checkpoint_load = args.load_checkpoint
-        total_timesteps = args.total_timesteps
-        action_std_init = args.action_std_init
+    args = parse_args()
+    exp_name = args.exp_name
+    train = args.train
+    town = args.town
+    render_mode = args.render_mode
+    checkpoint_load = args.load_checkpoint
+    total_timesteps = args.total_timesteps
+    action_std_init = args.action_std_init
+    highway_vehicles = args.highway_vehicles
 
-        try:
-            if exp_name == 'ppo':
-                run_name = "PPO"
-            else:
-                """
-                Here the functionality can be extended to different algorithms.
-                """
-                sys.exit()
-        except Exception as e:
-            print(e.message)
+    try:
+        if exp_name == 'ppo':
+            run_name = "PPO"
+        else:
+            """
+            Here the functionality can be extended to different algorithms.
+            """
             sys.exit()
-        
-        if train == True:
-            writer = SummaryWriter(f"runs/{run_name}_{action_std_init}_{int(total_timesteps)}/{town}")
-        else:
-            writer = SummaryWriter(f"runs/{run_name}_{action_std_init}_{int(total_timesteps)}_TEST/{town}")
-        writer.add_text(
-            "hyperparameters", "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}" for key, value in vars(args).items()])))
+    except Exception as e:
+        print(e.message)
+        sys.exit()
 
-        #Seeding to reproduce the results
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-        torch.manual_seed(args.seed)
-        torch.backends.cudnn.deterministic = args.torch_deterministic
+    if train == True:
+        vehicles_status = "vehiclesON" if bool(highway_vehicles) else "vehiclesOFF"
+        writer = SummaryWriter(f"runs/{run_name}_{action_std_init}_{int(total_timesteps)}_{vehicles_status}/{town}")
+    else:
+        writer = SummaryWriter(f"runs/{run_name}_{action_std_init}_{int(total_timesteps)}_TEST/{town}")
+    writer.add_text(
+        "hyperparameters", "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}" for key, value in vars(args).items()])))
 
-        action_std_decay_rate = 0.05
-        min_action_std = 0.05
-        action_std_decay_freq = 5e5
-        timestep = 0
-        episode = 0
-        cumulative_score = 0
-        episodic_length = 0
-        scores = list()
-        deviation_from_center = 0
-        distance_covered = 0
+    #Seeding to reproduce the results
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.backends.cudnn.deterministic = args.torch_deterministic
 
-        #========================================================================
-        #                           CONNECTING TO CARLA
-        #========================================================================
+    action_std_decay_rate = 0.05
+    min_action_std = 0.05
+    action_std_decay_freq = 5e5
+    timestep = 0
+    episode = 0
+    cumulative_score = 0
+    episodic_length = 0
+    scores = list()
+    deviation_from_center = 0
+    distance_covered = 0
 
-        try:
-            client, world = ClientConnection(town).setup()
-            logging.info("Connection has been setup successfully.")
-        except:
-            logging.error("Connection has been refused by the server.")
-            ConnectionRefusedError
+    #========================================================================
+    #                           CONNECTING TO CARLA
+    #========================================================================
 
-        if train:
-            print('The agent is set to train mode')
-            env = CarlaEnvironment(client, world, town)
-        else:
-            env = CarlaEnvironment(client, world, town, checkpoint_frequency=None)
-        encode = EncodeState(LATENT_DIM)
+    try:
+        client, world = ClientConnection(town).setup()
+        logging.info("Connection has been setup successfully.")
+    except:
+        logging.error("Connection has been refused by the server.")
+        ConnectionRefusedError
 
-        if render_mode:
-            settings = world.get_settings()
-            settings.no_rendering_mode = True
-            world.apply_settings(settings)
+    if train:
+        print('The agent is set to train mode')
+        env = CarlaEnvironment(client, world, town)
+    else:
+        env = CarlaEnvironment(client, world, town, checkpoint_frequency=None)
+    encode = EncodeState(LATENT_DIM)
 
-        #========================================================================
-        #                           ALGORITHM
-        #========================================================================
+    if render_mode:
+        settings = world.get_settings()
+        settings.no_rendering_mode = True
+        world.apply_settings(settings)
+
+    #========================================================================
+    #                           ALGORITHM
+    #========================================================================
+    while True:
         try:
             time.sleep(0.5)
 
@@ -240,6 +243,7 @@ def main():
                         handle.close
 
                 print("Terminating the run.")
+                writer.close()
                 sys.exit()
             else:
                 # Testing
@@ -291,8 +295,9 @@ def main():
                     distance_covered = 0
 
                 print("Terminating the run.")
+                writer.close()
                 sys.exit()
-                
+
         except Exception as outer_e:
             print("Outer Exception:", outer_e)
             print("Retrying after 5 seconds...")
