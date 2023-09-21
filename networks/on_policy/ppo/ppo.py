@@ -6,7 +6,6 @@ import numpy as np
 from torch.distributions import MultivariateNormal
 
 
-
 class ActorCritic(nn.Module):
     def __init__(self, obs_dim, action_dim, action_std_init):
         super(ActorCritic, self).__init__()

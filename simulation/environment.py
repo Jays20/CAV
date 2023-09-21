@@ -9,7 +9,7 @@ from simulation.settings import *
 
 MAX_CHANGE_STEER_THRESHOLD = 0.4
 MAX_JERK_THRESHOLD = 4
-THRESHOLD_DISTANCE = 1
+THRESHOLD_DISTANCE = 10
 TTC_THRESHOLD = 4
 
 class CarlaEnvironment():
@@ -140,7 +140,7 @@ class CarlaEnvironment():
 
             self.collision_history.clear()
             self.episode_start_time = time.time()
-            #  self.set_other_vehicles()
+            self.set_other_vehicles()
 
             return [self.image_obs, self.navigation_obs]
 
@@ -176,7 +176,7 @@ class CarlaEnvironment():
 
             throttle = round(float(action_idx[1]), 1)
             throttle = max(min(throttle, 1.0), -1.0)
-            
+
             if throttle > 0:
                 if throttle > 0.5:
                     self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=1))
@@ -353,12 +353,10 @@ class CarlaEnvironment():
             if len(self.actor_list) > 1 and vehicle != self.vehicle:
                 distance = self.distance_to_ego(vehicle.get_location())
                 if distance < THRESHOLD_DISTANCE:
-                    reward -= 150
-
-                ttc = self.calculate_collision_time(vehicle)
-                if ttc and ttc < TTC_THRESHOLD:
-                    print('COLLISION BELOW THRESHOLD')
-                    reward -= 10
+                    ttc = self.calculate_collision_time(vehicle)
+                    print('ttc: {}'.format(ttc))
+                    if ttc and ttc < TTC_THRESHOLD:
+                        reward -= 2
 
         return done, reward, steering_smoothness_penalty, jerk_penalty
 
@@ -389,26 +387,26 @@ class CarlaEnvironment():
 # ----------------------------------------------------------------
 
     def calculate_collision_time(self, secondary_vehicle):
-        xa0 = round(self.vehicle.get_location().x, 3)
-        xat = round(self.vehicle.get_velocity().x, 3)
-        ya0 = round(self.vehicle.get_location().y, 3)
-        yat = round(self.vehicle.get_velocity().y, 3)
-        xb0 = round(secondary_vehicle.get_location().x, 3)
-        xbt = round(secondary_vehicle.get_velocity().x, 3)
-        yb0 = round(secondary_vehicle.get_location().y, 3)
-        ybt = round(secondary_vehicle.get_velocity().y, 3)
+        # Get the positions and velocities of the two vehicles
+        xa0, ya0 = self.vehicle.get_location().x, self.vehicle.get_location().y
+        xat, yat = self.vehicle.get_velocity().x, self.vehicle.get_velocity().y
+        xb0, yb0 = secondary_vehicle.get_location().x, secondary_vehicle.get_location().y
+        xbt, ybt = secondary_vehicle.get_velocity().x, secondary_vehicle.get_velocity().y
 
-        if xat == 0 and yat == 0:
-            return None
+        # Calculate relative position and relative velocity
+        relative_x = xb0 - xa0
+        relative_y = yb0 - ya0
+        relative_vx = xbt - xat
+        relative_vy = ybt - yat
 
+        # Calculate TTC using relative distance and relative velocity
         try:
-            # time in seconds when the two vehicles will be the closest
-            mintime = round(-(xa0 * xat - xat * xb0 - (xa0 - xb0) * xbt + ya0 * yat - yat * yb0 - (ya0 - yb0) * ybt) / (xat**2 - 2 * xat * xbt + xbt**2 + yat**2 - 2 * yat * ybt + ybt**2))
-        except:
-            mintime = None
+            ttc = -(relative_x * relative_vx + relative_y * relative_vy) / (relative_vx**2 + relative_vy**2)
+        except ZeroDivisionError:
+            ttc = None
 
-        if 0 < mintime < 15:
-            return mintime
+        if ttc is not None and 0 < ttc < 15:
+            return ttc
         else:
             return None
 
