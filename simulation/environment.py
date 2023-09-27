@@ -169,19 +169,19 @@ class CarlaEnvironment():
             # Velocity of the vehicle
             velocity = self.vehicle.get_velocity()
             self.velocity = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) * 3.6
-            
-            # Apply vehicle steering and acceleration
-            steer = round(float(action_idx[0]), 1)
+
+            steer = float(action_idx[0])
             steer = max(min(steer, 1.0), -1.0)
 
             throttle = round(float(action_idx[1]), 1)
             throttle = max(min(throttle, 1.0), -1.0)
 
-            if throttle > 0:
-                if throttle > 0.5:
-                    self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=1))
-                else:
-                    self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=0.5))
+            if throttle >= -0.3 and throttle <= 0.3:
+                self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=0.5))
+                
+            elif throttle > 0.3:
+                self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=1))
+
             else:
                 self.vehicle.apply_control(carla.VehicleControl(steer=steer, brake=abs(throttle)))
 
