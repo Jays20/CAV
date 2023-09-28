@@ -1,0 +1,4 @@
+Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com, https://download.pytorch.org/whl/cu116
+Collecting torch
+  Downloading https://download.pytorch.org/whl/cu116/torch-1.13.1%2Bcu116-cp37-cp37m-win_amd64.whl (2434.1 MB)
+     ---------------------------------        2.0/2.4 GB 13.6 MB/s eta 0:00:32

@@ -292,7 +292,7 @@ class CarlaEnvironment():
             if len(self.actor_list) > 1 and vehicle != self.vehicle:
                 vehicle_location = vehicle.get_location()
                 velocity = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2)
-                vehicle_data = [vehicle_location.x, vehicle_location.y, vehicle_location.z, velocity]
+                vehicle_data = [vehicle_location.x, vehicle_location.y, velocity]
                 vehicle_connectivity.append(vehicle_data)
 
         return np.array(vehicle_connectivity)
