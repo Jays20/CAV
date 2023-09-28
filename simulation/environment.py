@@ -90,9 +90,9 @@ class CarlaEnvironment():
             self.previous_location = self.vehicle.get_location()
             self.distance_traveled = 0.0
             self.center_lane_deviation = 0.0
-            self.target_speed = 80 # previously 65 km/h
-            self.max_speed = 85.0
-            self.min_speed = 75.0
+            self.target_speed = 50.0
+            self.max_speed = 70.0
+            self.min_speed = 30.0
             self.max_distance_from_center = 3
             self.steer = float(0.0)
             self.throttle = float(0.0)
@@ -232,7 +232,7 @@ class CarlaEnvironment():
             # Get rewards
             done, reward, steering_penalty, jerk_penalty = self.reward(steer, delta_acceleration)
 
-            if self.timesteps >= 3500:
+            if self.timesteps >= 4500:
                 done = True
             elif self.current_waypoint_index >= len(self.route_waypoints) - 2:
                 done = True
@@ -287,12 +287,27 @@ class CarlaEnvironment():
 # ------------------------------------------------
 
     def vehicle_connectivity(self):
+        ego_location = self.vehicle.get_location()
         vehicle_connectivity = []
+
         for vehicle in self.actor_list:
             if len(self.actor_list) > 1 and vehicle != self.vehicle:
+
+                # determine distance between ego and vehicle
                 vehicle_location = vehicle.get_location()
-                velocity = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2)
-                vehicle_data = [vehicle_location.x, vehicle_location.y, vehicle_location.z, velocity]
+                distance_to_ego = math.sqrt( \
+                    (vehicle_location.x - ego_location.x) ** 2 + \
+                    (vehicle_location.y - ego_location.y) ** 2
+                )
+
+                # determine velocity of vehicle
+                speed = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2) * 3.6
+
+                # directional heading of the vehicle
+                directional_heading = math.atan2(vehicle_location.y - ego_location.y, vehicle_location.x - ego_location.x)
+                directional_heading_degrees = math.degrees(directional_heading)
+
+                vehicle_data = [distance_to_ego, speed, directional_heading_degrees]
                 vehicle_connectivity.append(vehicle_data)
 
         return np.array(vehicle_connectivity)

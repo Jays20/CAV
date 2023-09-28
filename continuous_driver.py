@@ -207,17 +207,6 @@ def main():
                         cumulative_score = np.mean(scores)
                     print('Episode: {}'.format(episode),' Timestep: {}'.format(timestep),' Reward:  {:.2f}'.format(current_ep_reward),' Average Reward:  {:.2f}'.format(cumulative_score))
 
-                    # Save agent after each episode
-                    agent.chkpt_save()
-                    chkt_file_nums = len(next(os.walk(f'checkpoints/PPO/{town}'))[2])
-                    if chkt_file_nums != 0:
-                        chkt_file_nums -= 1
-                    chkpt_file = f'checkpoints/PPO/{town}/checkpoint_ppo_'+str(chkt_file_nums)+'.pickle'
-                    data_obj = {'cumulative_score': cumulative_score, 'episode': episode, 'timestep': timestep, 'action_std_init': action_std_init}
-                    with open(chkpt_file, 'wb') as handle:
-                        pickle.dump(data_obj, handle)
-                    handle.close()
-
                     writer.add_scalar("Episodic Reward", scores[-1], episode)
                     writer.add_scalar("Cumulative Reward", cumulative_score, episode)
                     writer.add_scalar("Episode Length (s)", episodic_length, episode)
@@ -232,6 +221,15 @@ def main():
 
                     if episode % 10 == 0:
                         agent.learn()
+                        agent.chkpt_save()
+                        chkt_file_nums = len(next(os.walk(f'checkpoints/PPO/{town}'))[2])
+                        if chkt_file_nums != 0:
+                            chkt_file_nums -= 1
+                        chkpt_file = f'checkpoints/PPO/{town}/checkpoint_ppo_'+str(chkt_file_nums)+'.pickle'
+                        data_obj = {'cumulative_score': cumulative_score, 'episode': episode, 'timestep': timestep, 'action_std_init': action_std_init}
+                        with open(chkpt_file, 'wb') as handle:
+                            pickle.dump(data_obj, handle)
+                        handle.close()
 
                     if episode % 100 == 0:
                         agent.save()
