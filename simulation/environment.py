@@ -178,7 +178,7 @@ class CarlaEnvironment():
 
             if throttle >= -0.3 and throttle <= 0.3:
                 self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=0.5))
-                
+
             elif throttle > 0.3:
                 self.vehicle.apply_control(carla.VehicleControl(steer=steer, throttle=1))
 
@@ -291,8 +291,8 @@ class CarlaEnvironment():
         for vehicle in self.actor_list:
             if len(self.actor_list) > 1 and vehicle != self.vehicle:
                 vehicle_location = vehicle.get_location()
-                velocity = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2)
-                vehicle_data = [vehicle_location.x, vehicle_location.y, vehicle_location.z, velocity]
+                velocity = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2) * 3.6
+                vehicle_data = [vehicle_location.x, vehicle_location.y, velocity]
                 vehicle_connectivity.append(vehicle_data)
 
         return np.array(vehicle_connectivity)

@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument('--episode-length', type=int, default=EPISODE_LENGTH, help='max timesteps in an episode')
     parser.add_argument('--train', default=True, type=boolean_string, help='is it training?')
     parser.add_argument('--town', type=str, default="Town06", help='which town do you like?')
-    parser.add_argument('--load-checkpoint', type=bool, default=True, help='resume training?')
+    parser.add_argument('--load-checkpoint', type=bool, default=False, help='resume training?')
     parser.add_argument('--torch-deterministic', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True, help='if toggled, `torch.backends.cudnn.deterministic=False`')
     parser.add_argument('--cuda', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True, help='if toggled, cuda will not be enabled by deafult')
     parser.add_argument('--render-mode', type=bool, default=False, help='display Carla')
