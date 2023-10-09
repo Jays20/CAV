@@ -188,9 +188,11 @@ class CarlaEnvironment():
             self.throttle = throttle
 
             # Collect vehicle data
-            self.collision_history = self.collision_obj.collision_data            
+            self.collision_history = self.collision_obj.collision_data           
             self.rotation          = self.vehicle.get_transform().rotation.yaw
             self.location          = self.vehicle.get_location()
+
+            episode_total_collisions = len(self.collision_history)
 
             # Keep track of closest waypoint on the route
             waypoint_index = self.current_waypoint_index
@@ -252,7 +254,7 @@ class CarlaEnvironment():
             normalized_velocity             = self.velocity/self.target_speed
             normalized_distance_from_center = self.distance_from_center / self.max_distance_from_center
             normalized_angle                = abs(self.angle / np.deg2rad(20))
-            vehicle_connectivity            = self.vehicle_connectivity()
+            vehicle_connectivity, minimum_distance = self.vehicle_connectivity()
             self.navigation_obs             = np.array([self.throttle, self.velocity, normalized_velocity, normalized_distance_from_center, normalized_angle])
 
             # Remove everything that has been spawned in the env
@@ -268,7 +270,7 @@ class CarlaEnvironment():
                 for actor in self.actor_list:
                     actor.destroy()
 
-            return [self.image_obs, self.navigation_obs, vehicle_connectivity], reward, done, [self.distance_covered, self.center_lane_deviation, steering_penalty]
+            return [self.image_obs, self.navigation_obs, vehicle_connectivity], reward, done, [self.distance_covered, self.center_lane_deviation, steering_penalty, episode_total_collisions, minimum_distance]
 
         except:
             print('Exception at step method. Exiting ....')
@@ -289,6 +291,7 @@ class CarlaEnvironment():
     def vehicle_connectivity(self):
         ego_location = self.vehicle.get_location()
         vehicle_connectivity = []
+        distance_to_vehicles = []
 
         for vehicle in self.actor_list:
             if len(self.actor_list) > 1 and vehicle != self.vehicle:
@@ -300,6 +303,8 @@ class CarlaEnvironment():
                     (vehicle_location.y - ego_location.y) ** 2
                 )
 
+                distance_to_vehicles.append(distance_to_ego)
+
                 # determine velocity of vehicle
                 speed = math.sqrt(vehicle.get_velocity().x **2  + vehicle.get_velocity().y ** 2 + vehicle.get_velocity().z ** 2) * 3.6
 
@@ -310,7 +315,7 @@ class CarlaEnvironment():
                 vehicle_data = [distance_to_ego, speed, directional_heading_degrees]
                 vehicle_connectivity.append(vehicle_data)
 
-        return np.array(vehicle_connectivity)
+        return np.array(vehicle_connectivity), min(distance_to_vehicles)
 
 
 # -------------------------------------------------

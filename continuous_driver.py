@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument('--action-std-init', type=float, default=ACTION_STD_INIT, help='initial exploration noise')
     parser.add_argument('--test-timesteps', type=int, default=TEST_TIMESTEPS, help='timesteps to test our model')
     parser.add_argument('--episode-length', type=int, default=EPISODE_LENGTH, help='max timesteps in an episode')
-    parser.add_argument('--train', default=True, type=boolean_string, help='is it training?')
+    parser.add_argument('--train', default=False, type=boolean_string, help='is it training?')
     parser.add_argument('--town', type=str, default="Town06", help='which town do you like?')
     parser.add_argument('--load-checkpoint', type=bool, default=True, help='resume training?')
     parser.add_argument('--torch-deterministic', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True, help='if toggled, `torch.backends.cudnn.deterministic=False`')
@@ -269,29 +269,30 @@ def main():
                             t2 = datetime.now()
                             t3 = t2-t1
 
-                            episodic_length.append(abs(t3.total_seconds()))
+                            episodic_length = t3.total_seconds()
                             break
-                    deviation_from_center += info[1]
-                    distance_covered += info[0]
+
+                    distance_covered      = info[0]
+                    deviation_from_center = info[1]
+                    steering_penalty      = info[2]
+                    episode_total_collisions = info[3]
+                    minimum_distance      = info[4]
 
                     scores.append(current_ep_reward)
                     cumulative_score = np.mean(scores)
 
                     print('Episode: {}'.format(episode),', Timestep: {}'.format(timestep),', Reward:  {:.2f}'.format(current_ep_reward),', Average Reward:  {:.2f}'.format(cumulative_score))
 
-                    writer.add_scalar("TEST: Episodic Reward/episode", scores[-1], episode)
-                    writer.add_scalar("TEST: Cumulative Reward/info", cumulative_score, episode)
-                    writer.add_scalar("TEST: Cumulative Reward/(t)", cumulative_score, timestep)
-                    writer.add_scalar("TEST: Episode Length (s)/info", np.mean(episodic_length), episode)
-                    writer.add_scalar("TEST: Reward/(t)", current_ep_reward, timestep)
-                    writer.add_scalar("TEST: Deviation from Center/episode", deviation_from_center, episode)
-                    writer.add_scalar("TEST: Deviation from Center/(t)", deviation_from_center, timestep)
-                    writer.add_scalar("TEST: Distance Covered (m)/episode", distance_covered, episode)
-                    writer.add_scalar("TEST: Distance Covered (m)/(t)", distance_covered, timestep)
+                    writer.add_scalar("TEST: Episode Length (s)", episodic_length, episode)
+                    writer.add_scalar("TEST: Deviation from Center", deviation_from_center, episode)
+                    writer.add_scalar("TEST: Distance Covered (m)", distance_covered, episode)
+                    writer.add_scalar("TEST: Steering Penalty", steering_penalty, episode)
+                    writer.add_scalar("TEST: Number of colisions", episode_total_collisions, episode)
+                    writer.add_scalar("TEST: Minimum distance to other vehicles", minimum_distance, episode)
 
-                    episodic_length = list()
+                    episodic_length       = 0
                     deviation_from_center = 0
-                    distance_covered = 0
+                    distance_covered      = 0
 
                 print("Terminating the run.")
                 writer.close()
