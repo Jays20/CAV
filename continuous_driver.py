@@ -93,6 +93,7 @@ def main():
     scores = list()
     deviation_from_center = 0
     distance_covered = 0
+    episode_minimum_distance = 50
 
     #========================================================================
     #                           CONNECTING TO CARLA
@@ -256,6 +257,11 @@ def main():
                         # select action with policy
                         action = agent.get_action(observation, train=False)
                         observation, reward, done, info = env.step(action)
+                        
+                        minimum_distance = info[4]
+                        if episode_minimum_distance < minimum_distance:
+                            episode_minimum_distance = minimum_distance
+                        
                         if observation is None:
                             break
                         observation = encode.process(observation)
@@ -276,7 +282,6 @@ def main():
                     deviation_from_center = info[1]
                     steering_penalty      = info[2]
                     episode_total_collisions = info[3]
-                    minimum_distance      = info[4]
 
                     scores.append(current_ep_reward)
                     cumulative_score = np.mean(scores)
@@ -293,6 +298,7 @@ def main():
                     episodic_length       = 0
                     deviation_from_center = 0
                     distance_covered      = 0
+                    episode_minimum_distance = 50
 
                 print("Terminating the run.")
                 writer.close()

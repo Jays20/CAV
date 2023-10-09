@@ -387,16 +387,15 @@ class CarlaEnvironment():
 
     def set_other_vehicles(self):
         try:
-            # spawn_points_town06 = [279, 12, 275, 280, 13, 276]
             spawn_points_town06 = [12, 275]
-            blueprints_to_exclude = ["vehicle.diamondback.century", "vehicle.carlamotors.carlacola"]
+            blueprints_to_exclude = ["vehicle.diamondback.century", "vehicle.carlamotors.carlacola", "vehicle.gazelle.omafiets", "vehicle.bh.crossbike", "vehicle.yamaha.yzf", "vehicle.kawasaki.ninja"]
             for _ in range(0, len(spawn_points_town06)):
                 spawn_point = self.map.get_spawn_points()[spawn_points_town06[_]]
                 vehicle_blueprints = [bp for bp in self.blueprint_library.filter('vehicle') if bp.id not in blueprints_to_exclude]
                 bp_vehicle = random.choice(vehicle_blueprints)
                 other_vehicle = self.world.try_spawn_actor(bp_vehicle, spawn_point)
                 if other_vehicle is not None:
-                    other_vehicle.apply_control(carla.VehicleControl(throttle=1))
+                    other_vehicle.set_velocity(carla.Vector3D(12.5, 0, 0)) # 45 km/h
                     self.actor_list.append(other_vehicle)
         except:
             print('Exception has occured in spawning vehicles')
